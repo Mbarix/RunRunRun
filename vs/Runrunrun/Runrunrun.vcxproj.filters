@@ -32,7 +32,10 @@
     <Image Include="..\background.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="heart.png">
+    <Image Include="charamusuh.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="life.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
@@ -53,6 +56,12 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="heartSprite.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="enemySprite.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="enemySprite.frag">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

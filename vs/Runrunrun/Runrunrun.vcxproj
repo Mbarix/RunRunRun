@@ -137,12 +137,15 @@
   <ItemGroup>
     <Image Include="..\background.png" />
     <Image Include="..\charautama.png" />
-    <Image Include="heart.png" />
+    <Image Include="charamusuh.png" />
     <Image Include="homeranim.png" />
+    <Image Include="life.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\bgSprite.frag" />
     <None Include="..\bgSprite.vert" />
+    <None Include="enemySprite.frag" />
+    <None Include="enemySprite.vert" />
     <None Include="heartSprite.frag" />
     <None Include="heartSprite.vert" />
     <None Include="playerSprite.frag" />

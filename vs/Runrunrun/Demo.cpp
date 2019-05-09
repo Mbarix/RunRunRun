@@ -15,12 +15,15 @@ void Demo::Init()
 	BuildBackgroundSprite();
 	BuildPlayerSprite();
 	BuildHeartSprite();
+	BuildEnemySprite();
 }
 
 void Demo::Update(float deltaTime)
 {
 	UpdatePlayerSpriteAnim(deltaTime);
 	ControlPlayerSprite(deltaTime);
+	UpdateEnemySpriteAnim(deltaTime);
+	ControlEnemySprite(deltaTime);
 }
 
 void Demo::Render()
@@ -35,8 +38,11 @@ void Demo::Render()
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
 	DrawBackgroundSprite();
+	DrawEnemySprite();
 	DrawPlayerSprite();
-	DrawHeartSprite();
+	DrawHeartSprite(5);
+	DrawHeartSprite(50);
+	DrawHeartSprite(95);
 }
 
 
@@ -180,6 +186,146 @@ void Demo::BuildPlayerSprite()
 	xVelocity = 0.1f;
 }
 
+void Demo::UpdateEnemySpriteAnim(float deltaTime)
+{
+	// Update animation
+	frame_dur2 += deltaTime;
+
+	if (frame_dur2 > FRAME_DUR) {
+		frame_dur2 = 0;
+		if (frame_idx2 == NUM_FRAMES - 1) frame_idx2 = 0;  else frame_idx2++;
+
+		// Pass frameIndex to shader
+		GLint location = glGetUniformLocation(this->programEnemy, "frameIndex");
+		UseShader(this->programEnemy);
+		glUniform1i(location, frame_idx2);
+	}
+}
+
+void Demo::ControlEnemySprite(float deltaTime)
+{
+	xpos4 += deltaTime * 0.1f;
+
+	if (xpos4 > GetScreenWidth() + frame_width4 + 200) xpos4 = 0;
+
+	mat4 model;
+	model = translate(model, vec3(xpos4 - frame_width4, ypos4, 0.0f));
+
+	// Rotate sprite at origin
+	model = translate(model, vec3(0.5f * frame_width4, 0.5f * frame_height4, 0.0f));
+	model = rotate(model, radians(0.0f), vec3(0.0f, 0.0f, 1.0f));
+	model = translate(model, glm::vec3(-0.5f * frame_width4, -0.5f * frame_height4, 0.0f));
+
+	// Scale sprite 
+	model = scale(model, vec3(frame_width4, frame_height4, 1));
+
+	UseShader(this->programEnemy);
+	glUniformMatrix4fv(glGetUniformLocation(this->programEnemy, "model"), 1, GL_FALSE, value_ptr(model));
+}
+
+void Demo::DrawEnemySprite() {
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	// Bind Textures using texture units
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, textureEnemy);
+	UseShader(this->programEnemy);
+	glUniform1i(glGetUniformLocation(this->programEnemy, "ourTexture"), 0);
+
+	// set flip
+	glUniform1i(glGetUniformLocation(this->programEnemy, "flip"), flip2);
+	mat4 model;
+	// Translate sprite along x-axis
+	model = translate(model, vec3(xpos4-300, ypos4 - 53, 0.0f));
+	// Scale sprite 
+	model = scale(model, vec3(frame_width4, frame_height4, 1));
+	glUniformMatrix4fv(glGetUniformLocation(this->programEnemy, "model"), 1, GL_FALSE, value_ptr(model));
+
+	// Draw sprite
+	glBindVertexArray(VAOEnemy);
+	glDrawElements(GL_QUADS, 4, GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
+
+	glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture when done, so we won't accidentily mess up our texture.
+	glDisable(GL_BLEND);
+}
+
+void Demo::BuildEnemySprite()
+{
+	this->programEnemy = BuildShader("enemySprite.vert", "enemySprite.frag");
+
+	// Pass n to shader
+	UseShader(this->programEnemy);
+	glUniform1f(glGetUniformLocation(this->programEnemy, "n"), 1.0f / NUM_FRAMES);
+
+	// Load and create a texture 
+	glGenTextures(1, &textureEnemy);
+	glBindTexture(GL_TEXTURE_2D, textureEnemy); // All upcoming GL_TEXTURE_2D operations now have effect on our texture object
+
+	// Set texture filtering
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// Load, create texture 
+	int width, height;
+	unsigned char* image = SOIL_load_image("charamusuh.png", &width, &height, 0, SOIL_LOAD_RGBA);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+	SOIL_free_image_data(image);
+	glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture when done, so we won't accidentily mess up our texture.
+
+	// Set up vertex data (and buffer(s)) and attribute pointers
+	frame_width4 = ((float)width) / NUM_FRAMES;
+	frame_height4 = (float)height;
+	GLfloat vertices[] = {
+		// Positions   // Colors           // Texture Coords
+		1,  1, 0.0f,   1.0f, 1.0f, 1.0f,   1.0f, 1.0f, // Bottom Right
+		1,  0, 0.0f,   1.0f, 1.0f, 1.0f,   1.0f, 0.0f, // Top Right
+		0,  0, 0.0f,   1.0f, 1.0f, 1.0f,   0.0f, 0.0f, // Top Left
+		0,  1, 0.0f,   1.0f, 1.0f, 1.0f,   0.0f, 1.0f  // Bottom Left 
+	};
+
+	GLuint indices[] = {  // Note that we start from 0!
+		0, 3, 2, 1
+	};
+
+	glGenVertexArrays(1, &VAOEnemy);
+	glGenBuffers(1, &VBOEnemy);
+	glGenBuffers(1, &EBOEnemy);
+
+	glBindVertexArray(VAOEnemy);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBOEnemy);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOEnemy);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// Position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), 0);
+	glEnableVertexAttribArray(0);
+	// Color attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+	// TexCoord attribute
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(6 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(2);
+
+	glBindVertexArray(0); // Unbind VAO
+
+	// Set orthographic projection
+	mat4 projection;
+	projection = ortho(0.0f, static_cast<GLfloat>(GetScreenWidth()), static_cast<GLfloat>(GetScreenHeight()), 0.0f, -1.0f, 1.0f);
+	glUniformMatrix4fv(glGetUniformLocation(this->programEnemy, "projection"), 1, GL_FALSE, value_ptr(projection));
+
+	// set sprite position, gravity, velocity
+	xpos4 = (GetScreenWidth() - frame_width4) / 2;
+	yposGroundEnemy = GetScreenHeight() - frame_height4;
+	ypos4 = yposGroundEnemy;
+	gravityEnemy = 0.05f;
+	xVelocityEnemy = 0.1f;
+}
+
 void Demo::BuildBackgroundSprite()
 {
 	this->programBg = BuildShader("bgSprite.vert", "bgSprite.frag");
@@ -283,14 +429,14 @@ void Demo::BuildHeartSprite()
 
 	// Load, create texture 
 	int width, height;
-	unsigned char* image = SOIL_load_image("heart.png", &width, &height, 0, SOIL_LOAD_RGBA);
+	unsigned char* image = SOIL_load_image("life.png", &width, &height, 0, SOIL_LOAD_RGBA);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
 	SOIL_free_image_data(image);
 	glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture when done, so we won't accidentily mess up our texture.
 
 	// Set up vertex data (and buffer(s)) and attribute pointers
-	frame_width3 = (float)width/15;
-	frame_height3 = (float)height/15;
+	frame_width3 = (float)width;
+	frame_height3 = (float)height;
 	GLfloat vertices[] = {
 		// Positions   // Colors           // Texture Coords
 		1,  1, 0.0f,   1.0f, 1.0f, 1.0f,   1.0f, 1.0f, // Bottom Right
@@ -333,7 +479,7 @@ void Demo::BuildHeartSprite()
 	glUniformMatrix4fv(glGetUniformLocation(this->programHeart, "projection"), 1, GL_FALSE, value_ptr(projection));
 }
 
-void Demo::DrawHeartSprite() {
+void Demo::DrawHeartSprite(int jarak) {
 	// Bind Textures using texture units
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, textureHeart);
@@ -343,7 +489,7 @@ void Demo::DrawHeartSprite() {
 
 	mat4 model;
 	// Translate sprite along x-axis
-	model = translate(model, vec3(xpos3+5, ypos3+5, 0.0f));
+	model = translate(model, vec3(xpos3+jarak, ypos3+5, 0.0f));
 	// Scale sprite 
 	model = scale(model, vec3(frame_width3, frame_height3, 1));
 	glUniformMatrix4fv(glGetUniformLocation(this->programHeart, "model"), 1, GL_FALSE, value_ptr(model));
@@ -355,8 +501,6 @@ void Demo::DrawHeartSprite() {
 
 	glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture when done, so we won't accidentily mess up our texture.
 }
-
-
 
 int main(int argc, char** argv) {
 
